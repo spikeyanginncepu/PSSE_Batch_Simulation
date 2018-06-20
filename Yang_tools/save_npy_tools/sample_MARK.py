@@ -47,21 +47,30 @@ if __name__ == '__main__':
 	# print('判稳观察时刻为：', str(time1) + ' s', '\n', '此时各发电功角为：', list1, '\n')
 	# print('是否稳定（+1:稳定；-1:失稳；-2.角度未拉开，但功角小于0°）：', mark1, '\n', '最大功角差：', str(list1_width) + ' °')
 
-	sample_14_bus_1_mark = []
-	for i in range(96):
-		outfile_path = r'./Sample_14bus_1/t14Bus-PY-00' + str(i + 1) + '.out'
+	sample_14_bus_1_mark = []  # 标签列表
+	for i in range(960):
+		outfile_path = r'./t14Bus-PY-00' + str(i + 1) + '.out'
 		list1, time1 = get_steady_list(outfile_path, 5)
 		mark1, list1_width = marking(list1)
 		sample_14_bus_1_mark.append(mark1)
 		print('正在标注第 ', str(i + 1), '  个样本')
-	print(sample_14_bus_1_mark)
-	print(type(sample_14_bus_1_mark))
 
-	# 写进 txt 文件 ，方便 tensorflow-gpu 环境下的模型训练
-	# with open('./Sample_14bus_1/Sample_txt_1/t14Bus-labels.txt', 'w') as f:
+	print()
+	print('标签为：', sample_14_bus_1_mark)
+	print('标签长度为：', len(sample_14_bus_1_mark))
+	print('标签类型为：', type(sample_14_bus_1_mark))
+
+	# # 方案一：保存为txt文件，读取时用 eval() 函数将 str 转换为相应的type
+	# # 写进 txt 文件 ，方便 tensorflow-gpu 环境下的模型训练
+	# with open('./Sample_txt_1/a_label_lst.txt', 'w') as f:
 	# 	f.write(str(sample_14_bus_1_mark))
-	with open('./test-labels.txt', 'w') as f:
-		f.write(str(sample_14_bus_1_mark))
+
+	# 方案二：保存为 .npy 文件，存储效率最高，读取方便
+	label_path = r'./Sample_txt_1/a_label.npy'
+	np.save(label_path, sample_14_bus_1_mark)
+
+
+
 
 # # Sample-1 的标签
 # mark_done_1 = [1, 1, 1, 1, 1, -1, -1, -1, -1, -1, -1, -1, 1, 1, 1, 1, 1, 1, -1, -1, -1, -1, -1, -1, 1, 1, 1, 1, 1, 1,

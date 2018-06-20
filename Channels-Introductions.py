@@ -23,7 +23,7 @@ psspy.chsb(0, 1, [-1, -1, -1, 1, 11, 0])  # Vref -- voltage regulator voltage se
 # 12 BSFreq : 母线频率（偏移）
 psspy.chsb(0, 1, [-1, -1, -1, 1, 12, 0])  # BSFreq -- bus pu frequency deviations（偏移）.
 
-# 13 Volt (Complex) ：母线电压（复数）
+# 13 Volt (Complex) ：母线电压（复数）-- 亲测，是实数
 psspy.chsb(0, 1, [-1, -1, -1, 1, 13, 0])  # VOLT -- bus pu voltages (complex).
 
 # 14 Volt & Angle ：电压 & 相角

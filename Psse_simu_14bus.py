@@ -20,22 +20,23 @@ import redirect
 import dyntools
 import bsntools
 import psspy
-from bus_info import  *
+from bus_info import *
 
 [bus_id, bus_kv, notrans_brch, trans_brch] = get_14businfo()
 T = 1 / 60
 # clear_time = [i * T for i in range(5, 17)]  # 共 12 个不同的切除时间->[1.0833, 1.2833]
 clear_time = [i * T for i in range(5, 28, 2)]  # 共 12 个不同的切除时间->[1.0833, 1.45]
+# clear_time = [i * T for i in range(5, 41, 3)]  # 共 12 个不同的切除时间->[1.0833, 1.6333]
+
 fault_position = [0.1, 0.3, 0.5, 0.7, 0.9]  # 共 5 个不同的故障位置
-num_bus = len(bus_id)    # 14
-num_notrans_brch = len(notrans_brch)   # 16
-num_trans_brch = len(trans_brch)     # 4
+num_bus = len(bus_id)  # 14
+num_notrans_brch = len(notrans_brch)  # 16
+num_trans_brch = len(trans_brch)  # 4
 
 num_sample_id = 1
 
 
 def do_simulation(sav_path, dyr_path):
-
 	global num_sample_id
 
 	# set Samples Path
@@ -47,8 +48,8 @@ def do_simulation(sav_path, dyr_path):
 		os.makedirs(sample_path)
 
 	# # 1 母线故障——样本编号：1~12*num_bus -> [1, 168]
-	# # for i in range(num_bus):
-	# for i in range(1):
+	# for i in range(num_bus):
+	# # for i in range(1):
 	# 	for j in range(len(clear_time)):
 	# 		# init
 	# 		psspy.psseinit(50)
@@ -64,9 +65,9 @@ def do_simulation(sav_path, dyr_path):
 	#
 	# 		# perform Dynamic Simulation
 	# 		# 1) set "Channal Setup Wizard"
-	# 		psspy.chsb(0, 1, [-1, -1, -1, 1, 1, 0])    # Angle
-	# 		psspy.chsb(0, 1, [-1, -1, -1, 1, 7, 0])    #
-	# 		psspy.chsb(0, 1, [-1, -1, -1, 1, 13, 0])  #
+	# 		psspy.chsb(0, 1, [-1, -1, -1, 1, 1, 0])     # Angle -> 发电机功角
+	# 		psspy.chsb(0, 1, [-1, -1, -1, 1, 14, 0])    # Volt & Angle -> 电压&相角
+	# 		psspy.chsb(0, 1, [-1, -1, -1, 1, 16, 0])    # Flow (P & Q) -> 潮流
 	#
 	# 		# 2) name output file
 	# 		psspy.set_chnfil_type(0)  # 1 for OUTX format, 0 for (old) OUT format
@@ -90,14 +91,19 @@ def do_simulation(sav_path, dyr_path):
 	# 		psspy.dist_clear_fault(1)
 	# 		psspy.run(0, 10.0, 0, 1, 1)
 
-
-# 2 非变压器支路故障——样本编号： [bus_id ,bus_id + 960]
-# 	for i in range(num_notrans_brch):
+	# 2 非变压器支路故障——样本编号： [bus_id ,bus_id + 960]
+	# 根据本循环写的嵌套次序，故障时间每12条仿真为一个循环
+	# for i in range(num_notrans_brch):
 	for i in range(1):
-		for k in range(len(fault_position)):
-			for j in range(len(clear_time)):
+		# for k in range(len(fault_position)):
+		for k in range(3):
+			# for j in range(len(clear_time)):
+			for j in range(12):
+				print('\n\n\n\n----------------我是分割线--------------\n\n\n\n\n')
+				print('已仿真第 '+str(num_sample_id)+' 条样本')
+
 				# init
-				psspy.psseinit(50)
+				psspy.psseinit(10)
 				psspy.case(sav_path)
 				psspy.fnsl([0, 0, 0, 1, 1, 0, 99, 0])
 				psspy.cong(0)
@@ -110,9 +116,9 @@ def do_simulation(sav_path, dyr_path):
 
 				# perform Dynamic Simulation
 				# 1) set "Channal Setup Wizard"
-				psspy.chsb(0, 1, [-1, -1, -1, 1, 1, 0])    # Angle
-				psspy.chsb(0, 1, [-1, -1, -1, 1, 7, 0])    #
-				psspy.chsb(0, 1, [-1, -1, -1, 1, 13, 0])  #
+				psspy.chsb(0, 1, [-1, -1, -1, 1, 1, 0])      # Angle -> 发电机功角
+				psspy.chsb(0, 1, [-1, -1, -1, 1, 14, 0])    # Volt & Angle -> 电压&相角
+				psspy.chsb(0, 1, [-1, -1, -1, 1, 16, 0])    # Flow (P & Q) -> 潮流
 
 				# 2) name output file
 				psspy.set_chnfil_type(0)  # 1 for OUTX format, 0 for (old) OUT format
@@ -129,9 +135,12 @@ def do_simulation(sav_path, dyr_path):
 				# 5) set fault run time
 				psspy.run(0, 1 + clear_time[j], 0, 1, 1)
 
-				# 5) clear fault, and run net to 10 seconds
+				# 6) clear fault, and run net to 10 seconds
 				psspy.dist_clear_fault(1)
 				psspy.run(0, 10.0, 0, 1, 1)
+
+				# 7) 关闭本次仿真相关的文件, importaant !!!!!!!!!!!!!!!!!!!!!!
+				psspy.pssehalt_2()
 
 	# # 3 变压器支路故障——样本编号：[notransBrch_id, notransBrch_id+48]
 	# for i in range(num_trans_brch):
@@ -151,20 +160,22 @@ def do_simulation(sav_path, dyr_path):
 	# 		# perform Dynamic Simulation
 	# 		# 1) set "Channal Setup Wizard"
 	# 		psspy.chsb(0, 1, [-1, -1, -1, 1, 1, 0])  # Angle
-	# 		psspy.chsb(0, 1, [-1, -1, -1, 1, 7, 0])  #
-	# 		psspy.chsb(0, 1, [-1, -1, -1, 1, 13, 0])  #
+	# 		psspy.chsb(0, 1, [-1, -1, -1, 1, 7, 0])  # Speed
+	# 		psspy.chsb(0, 1, [-1, -1, -1, 1, 13, 0])  # Volt (Complex)
 	#
 	# 		# 2) name output file
 	# 		psspy.set_chnfil_type(0)  # 1 for OUTX format, 0 for (old) OUT format
-	# 		psspy.strt_2([0, 1], sample_path + '\\t9Bus-PY-00' + str(num_sample_id) + '.out')
+	# 		psspy.strt_2([0, 1], sample_path + '\\t14Bus-PY-00' + str(num_sample_id) + '.out')
 	# 		num_sample_id += 1
-
+	#
 	# 		# 3) in normal stat, run network to 1 seconds
 	# 		psspy.run(0, 1.0, 0, 1, 1)
 	#
-	# 		# 4) set Balanced_branch_fault with R,X -> [0, 0]
-	# 		psspy.dist_branch_fault(trans_brch[i][0], trans_brch[i][1], r"""T2""",
-	# 								1, bus_kv[trans_brch[i][0]-1], [0.0, 0.0])		# --------  ! important
+	# 		# 4) set Balanced_branch_fault, default with R,X -> [0, -2E9]
+	# 		# #  注意：r"""1""" 是指branch的id，可人为指定，14bus case 默认所有branch的id为“1“
+	# 		# #             因此这里不用循环；但 9 bus case 的trans-branch的id为【T1, T2, T3】 !!!
+	# 		psspy.dist_branch_fault(trans_brch[i][0], trans_brch[i][1], r"""1""", 1, bus_kv[trans_brch[i][0] - 1],
+	# 								[2E10, -2E+0])  # --------  实验结果表明，变压器故障无论如何是都不会失稳的！！！
 	#
 	# 		# 5) set fault run time
 	# 		psspy.run(0, 1 + clear_time[j], 0, 1, 1)
@@ -176,5 +187,6 @@ def do_simulation(sav_path, dyr_path):
 
 if __name__ == '__main__':
 	sav_path = r'.\Models\14Bus-test\IEEE14bus_v32.sav'
-	dyr_path = r'.\Models\14Bus-test\ieee14.dyr'
+	# dyr_path = r'.\Models\14Bus-test\ieee14.dyr'  # Sample-1
+	dyr_path = r'.\Models\14Bus-test\ieee14_ori.dyr'   # 关闭调速器，稳定器 Sample-2
 	do_simulation(sav_path, dyr_path)
