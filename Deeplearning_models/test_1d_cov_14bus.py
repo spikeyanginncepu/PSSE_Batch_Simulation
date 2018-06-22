@@ -12,6 +12,7 @@ from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Activation
 from keras.layers import Conv1D, GlobalMaxPooling1D, MaxPooling1D
+from keras.optimizers import SGD, Adam
 
 # 加载样本数据 alone .txt 文件 — 100条全耗时 48.458 秒
 #                                                    100条[0.5s,3s]片段耗时14s
@@ -24,9 +25,9 @@ from keras.layers import Conv1D, GlobalMaxPooling1D, MaxPooling1D
 
 
 # 1 导入数据
-data = np.load('../Sample_14bus_3/Sample_txt_1/a_data.npy')
-labels = np.load('../Sample_14bus_3/Sample_txt_1/a_label.npy')
-time_seq = np.load('../Sample_14bus_3/Sample_txt_1/a_time.npy') # 切片后的time
+data = np.load('../Samples/Sample_14bus_2/Sample_txt_1/a_data.npy')
+labels = np.load('../Samples/Sample_14bus_2/Sample_txt_1/a_label.npy')
+time_seq = np.load('../Samples/Sample_14bus_2/Sample_txt_1/a_time.npy')  # 切片后的time
 
 # 将data的 channel 和 采样点 转置 --> 方便后续 1dcov 数据输入
 data = np.transpose(data, (0, 2, 1))
@@ -39,33 +40,72 @@ for i in range(80):
 	for j in range(12):
 		time_clear_idx.append(j)
 time_clear_idx = np.array(time_clear_idx)
-print('前36个sample的 time_clear_idx 索引为：\n', time_clear_idx[:36])
+# print('前36个sample的 time_clear_idx 索引为：\n', time_clear_idx[:36])
 
 # # 确定故障切除时间
-# # clear_time = [i * T for i in range(5, 28, 2)]  # 共 12 个不同的切除时间->[1.0833, 1.45]
-# print(time_seq[61])  # 1s末
-# print(time_seq[61 + 5 * 2])  # 1.0833s末
-# print(time_seq[61 + 28 * 2])  # 1.45s末
+# clear_time = [i * 1/60 for i in range(5, 28, 2)]  # 共 12 个不同的切除时间->[1.0833, 1.45]
+# print(clear_time)
+
+# print(time_seq[62])  # 1s末
+# print(time_seq[62 + 5 * 2])  # 1.0833s末
+# print(time_seq[62 + 27 * 2])  # 1.45s末
 
 # 1.2 对data的采样点进行进一步切片
-#       - 切片方案 1：取故障切除后的 8个T，
+slice_flag = 1
+
+# 切片方案 1：取故障切除后的 3个T，
+if slice_flag == 1:
+	slice_t = 3     # 取故障后 3T 的采样点
+	slice_len = slice_t * 2  # 故障切除后的采样长度
+	data_tmp = np.zeros((data.shape[0], slice_len, data.shape[2]))
+	print('data_tmp 占位符的 shape 为：', data_tmp.shape)
+
+	for i in range(len(data)):
+		# 经历5T施加故障；    每隔2T再施加故障，总共12次间隔
+		data_tmp[i] = data[i][62 + 5 * 2 + (time_clear_idx[i] * 2) * 2:62 + 5 * 2 + (time_clear_idx[i] * 2) * 2 + slice_len, :]
+	# print(data_tmp[0][:, 0])
+	print('切片后第 1 个sample的每一列长度为：', data_tmp[0][:, 0].shape)
+	del data
+	data = data_tmp
+
+# 切片方案 2：取所有样本 从“故障开始到 n*T”的切片
+#                  	理论上分类是不可能准确的
+if slice_flag == 2:
+	slice_t = 3
+	slice_len = slice_t*2
+	data_tmp = np.zeros((data.shape[0], slice_len, data.shape[2]))
+	print('data_tmp 占位符的 shape 为：', data_tmp.shape)
+
+	for i in range(data.shape[0]):
+		data_tmp[i] = data[i][62:62+slice_len, :]
+
+	print('切片后第 1 个sample的每一列长度为：', data_tmp[0][:, 0].shape)
+	del data
+	data = data_tmp
 
 
-
-
-# 2 分割样本为 train/test, 比例为 2：1
+# 2 分割样本为 train/test
 # 2.1 生成样本集索引, 并shuffle
-np.random.seed(3)  # 随机可复现
-data_shuffle_idx = np.arange(960)
+# np.random.seed(3)  # 随机可复现
+data_shuffle_idx = np.arange(data.shape[0])
 np.random.shuffle(data_shuffle_idx)
 # print(data_shuffle_idx)
 
 # 2.2 按shuffle后的index进行样本集分割
-idx_2_3 = int(len(data_shuffle_idx) / 3) * 2  # 定位到前2/3的index位置
-train_idx = data_shuffle_idx[0:idx_2_3]  # train set 的 index
-test_idx = data_shuffle_idx[idx_2_3:]  # test set 的 index
+tt_flag = 2
+
+# 方案一： , 比例为 2：1
+if tt_flag == 1:
+	idx_tt = int(len(data_shuffle_idx) / 3) * 2  # 定位到前2/3的index位置
+# 方案一： , 比例为 4：1
+if tt_flag == 2:
+	idx_tt = int(len(data_shuffle_idx) /6)  # 定位到前2/3的index位置
+
+train_idx = data_shuffle_idx[0:idx_tt]  # train set 的 index
+test_idx = data_shuffle_idx[idx_tt:]  # test set 的 index
 # print(len(train_idx))
 # print(test_idx.shape)
+
 
 # 2.3 生成 train/test set
 x_train = data[train_idx]  # (640, 303, 108)
@@ -96,9 +136,9 @@ if scaler_flag == 1:
 # print(x_train_norm[0][:, 7])
 # print(x_train_norm[0].shape)
 
-# 方案二：转换shape 为 (640*108, 303), 按 train set 总样本的各feature的max/min为基准，将所有样本map到 [0,1]
+# 方案二：转换shape 为 (640*303, 108), 按 train set 总样本的各feature的max/min为基准，将所有样本map到 [0,1]
 if scaler_flag == 2:
-	x_train_tmp = np.reshape(x_train, (len(x_train) * 303, 108))
+	x_train_tmp = np.reshape(x_train, (len(x_train) * x_train.shape[1], x_train.shape[2]))
 	# print(x_train_tmp.shape) # 观察数据结构，注意在一开始 data 转置果，即channel和采样点交换过
 	scaler = MinMaxScaler(feature_range=(0, 1))
 	scaler.fit_transform(x_train_tmp)
@@ -161,12 +201,12 @@ if label_flag == 3:
 	y_test[y_test == -1] = 1
 	y_test[y_test == -2] = 1
 
-	# # 观察数据结构
-	# print(np.sum(y_train == 0))  # 稳定
-	# print(np.sum(y_train == 1))  # 失稳
-	# print()
-	# print(np.sum(y_test == 0))
-	# print(np.sum(y_test == 1))
+# # 观察数据结构
+# print(np.sum(y_train == 0))  # 稳定
+# print(np.sum(y_train == 1))  # 失稳
+# print()
+# print(np.sum(y_test == 0))
+# print(np.sum(y_test == 1))
 
 # 5 搭建模型
 
@@ -178,7 +218,7 @@ model = Sequential()
 # 		- 输入： （None, 303, 108）
 #     - 输出：    (None, 303-2, num_filters=200)
 #     - kernel_size = 3
-model.add(Conv1D(200, 3, padding='valid', activation='relu', strides=1, input_shape=(303, 108)))
+model.add(Conv1D(10, 3, padding='valid', activation='relu', strides=1, input_shape=data[0].shape))
 
 # 第二层：pooling，全局池化层
 # 	    - 输出为 (None，1，num_filters=200)
@@ -207,21 +247,21 @@ if label_flag == 1:
 if label_flag == 2 or label_flag == 3:
 	model.add(Dense(1, activation='sigmoid'))
 
+	adam = Adam(lr=0.0005, beta_1=0.9, beta_2=0.999,epsilon=1e-8)
 	# 模型编译
 	model.compile(loss='binary_crossentropy',
-				  optimizer='adam',
+				  optimizer=adam,
 				  metrics=['accuracy'])
 
-	# metrics 还可用用下面的方式定义
-	# metrics = ['accuracy', 'mae'])
-
+# metrics 还可用用下面的方式定义
+# metrics = ['accuracy', 'mae'])
 
 # 6 模型训练
-train_flag = 0
+train_flag = 1
 if train_flag == 1:
 	#  参数设置：
-	batch_size = 8
-	epochs = 10
+	batch_size = len(x_train_norm)
+	epochs = 800
 
 	model.fit(x_train_norm, y_train,
 			  batch_size=batch_size,
@@ -229,7 +269,7 @@ if train_flag == 1:
 			  verbose=1,
 			  validation_data=(x_test_norm, y_test))
 
-	print(model.summary())
+	# print(model.summary())
 
 	print()
 	print('测试集的数据结构：', x_test_norm.shape)
@@ -238,17 +278,25 @@ if train_flag == 1:
 	# 预测输出的是 softmax 概率，和为 1
 	if label_flag == 1:
 		pred_idx = 0
-		x_pred = model.predict(x_test_norm[pred_idx].reshape(1, 303, 108))
+		x_pred = model.predict(x_test_norm[pred_idx].reshape(1, data.shape[1], data.shape[2]))
 		# x_pred = model.predict(x_test_norm[pred_idx]) # 奇怪，必须按上式reshape，否则报错
-		print('预测输出 softmax 为：\n', x_pred)
+		print('第 '+str(pred_idx+1)+' 个test样本的预测输出 softmax 为：\n', x_pred)
 		print()
 		print('预测输出 softmax 概率之和为：\n', np.sum(x_pred))
 		print()
-		print('预测输出的分类为：\n', (x_pred == np.max(x_pred))*1)
+		print('预测输出的分类为：\n', (x_pred == np.max(x_pred)) * 1)
 		print()
 		print('实际类标签为：\n', y_test[pred_idx])
 		print()
 
+	if label_flag == 2 or label_flag == 3:
+		pred_idx = 2
+		x_pred = model.predict(x_test_norm[pred_idx].reshape(1, data.shape[1], data.shape[2]))
+		print('第 ' + str(pred_idx + 1) + ' 个test样本的预测输出 sigmoid 为：\n', x_pred)
+		print()
+		print('预测输出的分类为：\n', (x_pred>0.5)*1)
+		print()
+		print('实际类标签为：\n', y_test[pred_idx])
 
 
 	# test --> evaluate 得分
